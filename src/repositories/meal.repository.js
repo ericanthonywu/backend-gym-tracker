@@ -128,7 +128,9 @@ const mealRepository = {
     return {
       mealsPerDay,
       byDate: rows.map((r) => ({
-        date: r.log_date,
+        date: r.log_date instanceof Date
+          ? moment(r.log_date).format('YYYY-MM-DD')
+          : String(r.log_date).substring(0, 10),
         checkedCount: parseInt(r.checked_count, 10),
         totalCount: parseInt(r.total_count, 10),
       })),
