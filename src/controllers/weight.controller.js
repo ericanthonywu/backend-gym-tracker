@@ -6,7 +6,7 @@ const validate = require('../middlewares/validator');
 
 const logSchema = Joi.object({
   weightKg: Joi.number().min(1).max(300).required(),
-  notes: Joi.string().max(500).allow('').optional(),
+  notes: Joi.string().max(500).allow('', null).optional(),
 });
 
 const weightController = {

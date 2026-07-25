@@ -20,7 +20,7 @@ const exerciseNameSchema = Joi.object({
 });
 
 const completeSchema = Joi.object({
-  notes: Joi.string().max(1000).allow('').optional(),
+  notes: Joi.string().max(1000).allow('', null).optional(),
 });
 
 const sessionController = {
