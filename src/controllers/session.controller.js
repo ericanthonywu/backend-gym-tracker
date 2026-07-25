@@ -120,6 +120,14 @@ const sessionController = {
       return res.status(204).send();
     } catch (err) { next(err); }
   },
+
+  /** DELETE /api/sessions/:id */
+  async delete(req, res, next) {
+    try {
+      await sessionService.delete(req.params.id);
+      return res.status(204).send();
+    } catch (err) { next(err); }
+  },
 };
 
 module.exports = sessionController;

@@ -1,9 +1,6 @@
 'use strict';
 
 const db = require('../config/database');
-const moment = require('moment-timezone');
-
-const TZ = 'Asia/Jakarta'; // WIB (UTC+7)
 
 /**
  * Session Repository — all DB access for workout sessions and sets.
@@ -59,6 +56,14 @@ const sessionRepository = {
 
     const [row] = await db('workout_sessions').where({ id }).update(updates).returning('*');
     return row;
+  },
+
+  /**
+   * @param {string} id
+   * @returns {Promise<number>} number of deleted rows
+   */
+  async deleteSession(id) {
+    return db('workout_sessions').where({ id }).del();
   },
 
   /**

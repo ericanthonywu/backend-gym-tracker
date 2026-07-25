@@ -164,6 +164,16 @@ const sessionService = {
   },
 
   /**
+   * Delete a session and all its sets.
+   * @param {string} sessionId
+   */
+  async delete(sessionId) {
+    const session = await sessionRepository.findById(sessionId);
+    if (!session) throw new AppError('Session not found', 404);
+    await sessionRepository.deleteSession(sessionId);
+  },
+
+  /**
    * Paginated session history.
    * @param {{ page: number, limit: number }} opts
    */
