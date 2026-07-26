@@ -250,15 +250,14 @@ const sessionService = {
     const offset = (page - 1) * limit;
     const { data, total } = await sessionRepository.findHistory({ limit, offset });
 
-    // Attach sets to each session
-    const withSets = await Promise.all(
+    // Attach full session detail (exercises & sets) to each history item
+    const withDetail = await Promise.all(
       data.map(async (s) => {
-        const sets = await sessionRepository.findSets(s.id);
-        return { ...s, sets };
+        return this._buildSessionDetail(s.id);
       }),
     );
 
-    return { data: withSets, total, page, limit, totalPages: Math.ceil(total / limit) };
+    return { data: withDetail, total, page, limit, totalPages: Math.ceil(total / limit) };
   },
 
   /**
