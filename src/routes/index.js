@@ -30,6 +30,7 @@ router.delete('/workout-plans/:id', workoutPlanController.delete);
 // Weekly Schedule
 router.get('/schedule', scheduleController.getAll);
 router.get('/schedule/today', scheduleController.getToday);
+router.get('/schedule/notification-check', scheduleController.notificationCheck);
 router.put('/schedule', ...scheduleController.updateAll);
 router.post('/schedule/skip-today', scheduleController.skipToday);
 router.post('/schedule/dismiss-skip/:skipId', scheduleController.dismissSkip);

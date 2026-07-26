@@ -31,6 +31,14 @@ const scheduleController = {
     } catch (err) { next(err); }
   },
 
+  /** GET /api/schedule/notification-check */
+  async notificationCheck(req, res, next) {
+    try {
+      const result = await scheduleService.getNotificationCheck();
+      return res.status(200).json(result);
+    } catch (err) { next(err); }
+  },
+
   /** PUT /api/schedule */
   updateAll: [
     validate(updateAllSchema),

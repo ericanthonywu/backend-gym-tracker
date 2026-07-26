@@ -67,6 +67,20 @@ const sessionRepository = {
   },
 
   /**
+   * Find a completed session completed between two timestamps.
+   * @param {Date} startDate
+   * @param {Date} endDate
+   * @returns {Promise<Object|undefined>}
+   */
+  async findCompletedBetween(startDate, endDate) {
+    return db('workout_sessions')
+      .where({ status: 'completed' })
+      .where('completed_at', '>=', startDate)
+      .where('completed_at', '<=', endDate)
+      .first();
+  },
+
+  /**
    * Paginated history of completed sessions.
    * @param {{ limit: number, offset: number }} opts
    * @returns {Promise<{ data: Array, total: number }>}

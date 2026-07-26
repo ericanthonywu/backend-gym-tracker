@@ -4,6 +4,7 @@ const moment = require('moment-timezone');
 const scheduleRepository = require('../repositories/schedule.repository');
 const skippedDayRepository = require('../repositories/skipped-day.repository');
 const workoutPlanRepository = require('../repositories/workout-plan.repository');
+const sessionRepository = require('../repositories/session.repository');
 const AppError = require('../utils/app-error');
 
 const TZ = 'Asia/Jakarta';
@@ -95,6 +96,52 @@ const scheduleService = {
         plan: todayPlan,
       },
       skippedBanner,
+      notificationCheck: await this.getNotificationCheck(),
+    };
+  },
+
+  /**
+   * Check if yesterday had a scheduled workout that was missed/skipped.
+   * Rest days are NEVER marked as skipped days.
+   * Used by frontend notification engine to customize reminder copywriting.
+   *
+   * @returns {Promise<{ yesterdaySkipped: boolean, yesterdayPlanName: string|null }>}
+   */
+  async getNotificationCheck() {
+    const now = moment.tz(TZ);
+    const yesterday = now.clone().subtract(1, 'day');
+    const yesterdayStr = yesterday.format('YYYY-MM-DD');
+    const dbDay = jsToDbDay(yesterday.day());
+
+    // Check yesterday's schedule
+    const scheduled = await scheduleRepository.findByDay(dbDay);
+
+    // If yesterday was a rest day (or no plan scheduled), it is NEVER marked as skipped!
+    if (!scheduled || scheduled.is_rest_day || !scheduled.plan_id) {
+      return {
+        yesterdaySkipped: false,
+        yesterdayPlanName: null,
+      };
+    }
+
+    // Yesterday was a scheduled workout day — check if a completed session was logged yesterday via repository
+    const yesterdayStart = yesterday.clone().startOf('day').toDate();
+    const yesterdayEnd = yesterday.clone().endOf('day').toDate();
+
+    const completedSession = await sessionRepository.findCompletedBetween(yesterdayStart, yesterdayEnd);
+
+    if (completedSession) {
+      // Session was completed yesterday — not skipped!
+      return {
+        yesterdaySkipped: false,
+        yesterdayPlanName: null,
+      };
+    }
+
+    // Scheduled workout day with no completed session saved -> Marked as skipped!
+    return {
+      yesterdaySkipped: true,
+      yesterdayPlanName: scheduled.plan_name,
     };
   },
 
