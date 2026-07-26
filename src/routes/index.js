@@ -9,6 +9,8 @@ const scheduleController = require('../controllers/schedule.controller');
 const sessionController = require('../controllers/session.controller');
 const weightController = require('../controllers/weight.controller');
 const mealController = require('../controllers/meal.controller');
+const activityController = require('../controllers/activity.controller');
+const statsController = require('../controllers/stats.controller');
 
 const router = Router();
 
@@ -61,5 +63,14 @@ router.delete('/meals/settings/:id', mealController.deleteSetting);
 router.get('/meals/today', mealController.getToday);
 router.patch('/meals/toggle', ...mealController.toggle);
 router.get('/meals/summary', mealController.getSummary);
+
+// Master Activities
+router.get('/activities', activityController.list);
+router.get('/activities/search', activityController.search);
+router.post('/activities', ...activityController.create);
+
+// Stats / Progress Graphs
+router.get('/stats/exercises', statsController.listExercises);
+router.get('/stats/exercises/:exerciseName/progress', statsController.exerciseProgress);
 
 module.exports = router;

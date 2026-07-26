@@ -37,7 +37,13 @@ const sessionService = {
 
     // Pre-generate all sets for every exercise
     const sets = [];
+    const exerciseNames = exercises.map((ex) => ex.name);
+
+    // Look up last session's reps/weight for smart defaults
+    const lastSets = await sessionRepository.findLastCompletedSets(exerciseNames, session.id);
+
     exercises.forEach((ex, exIndex) => {
+      const prev = lastSets.get(ex.name) || null;
       for (let s = 1; s <= ex.target_sets; s++) {
         sets.push({
           session_id: session.id,
@@ -46,6 +52,8 @@ const sessionService = {
           set_number: s,
           reps: null,
           weight_kg: null,
+          default_reps: prev ? prev.reps : null,
+          default_weight_kg: prev ? prev.weightKg : null,
           is_skipped: false,
           is_completed: false,
           rest_duration_seconds: 120,
@@ -77,10 +85,11 @@ const sessionService = {
 
   /**
    * Record reps + weight for a single set.
+   * Returns both the updated set and a comparison vs the previous session.
    * @param {string} sessionId
    * @param {string} setId
    * @param {{ reps: number, weightKg: number|null }} data
-   * @returns {Promise<Object>} updated set
+   * @returns {Promise<{ set: Object, comparison: Object|null }>}
    */
   async recordSet(sessionId, setId, data) {
     const session = await sessionRepository.findById(sessionId);
@@ -92,7 +101,36 @@ const sessionService = {
     if (set.is_skipped) throw new AppError('This set was skipped', 400);
     if (set.is_completed) throw new AppError('This set is already completed', 400);
 
-    return sessionRepository.completeSet(setId, { reps: data.reps, weightKg: data.weightKg });
+    // Look up previous session's data for this exercise (for comparison)
+    const prevSet = await sessionRepository.findLastSetForExercise(set.exercise_name, sessionId);
+
+    // Save the set
+    const updatedSet = await sessionRepository.completeSet(setId, { reps: data.reps, weightKg: data.weightKg });
+
+    // Build comparison
+    let comparison = null;
+    if (prevSet) {
+      const prevReps = prevSet.reps || 0;
+      const prevWeight = prevSet.weight_kg ? parseFloat(prevSet.weight_kg) : 0;
+      const newReps = data.reps || 0;
+      const newWeight = data.weightKg || 0;
+      const repsChange = newReps - prevReps;
+      const weightChange = parseFloat((newWeight - prevWeight).toFixed(2));
+
+      let verdict = 'same';
+      if (repsChange > 0 || weightChange > 0) verdict = 'improved';
+      else if (repsChange < 0 || weightChange < 0) verdict = 'declined';
+
+      comparison = {
+        prevReps,
+        prevWeightKg: prevWeight,
+        repsChange,
+        weightChange,
+        verdict,
+      };
+    }
+
+    return { set: updatedSet, comparison };
   },
 
   /**

@@ -170,6 +170,56 @@ const sessionRepository = {
       .select('exercise_name');
     return rows.map((r) => r.exercise_name);
   },
+
+  /**
+   * Find the last completed set for each given exercise name
+   * (from all completed sessions, not the current one).
+   * Used to pre-fill smart defaults when a new session starts.
+   *
+   * @param {string[]} exerciseNames
+   * @param {string} excludeSessionId — the session currently being created (exclude it)
+   * @returns {Promise<Map<string, { reps: number, weight_kg: number|null }>>}
+   */
+  async findLastCompletedSets(exerciseNames, excludeSessionId) {
+    if (!exerciseNames.length) return new Map();
+
+    const rows = await db('workout_session_sets as s')
+      .join('workout_sessions as ws', 's.session_id', 'ws.id')
+      .whereIn('s.exercise_name', exerciseNames)
+      .where('s.is_completed', true)
+      .where('ws.status', 'completed')
+      .whereNot('s.session_id', excludeSessionId)
+      .orderBy('s.completed_at', 'desc')
+      .select('s.exercise_name', 's.reps', 's.weight_kg', 's.completed_at');
+
+    // For each exercise name, keep only the most recent completed set
+    const map = new Map();
+    for (const row of rows) {
+      if (!map.has(row.exercise_name)) {
+        map.set(row.exercise_name, { reps: row.reps, weightKg: row.weight_kg ? parseFloat(row.weight_kg) : null });
+      }
+    }
+    return map;
+  },
+
+  /**
+   * Find the last completed set for a specific exercise across all completed sessions
+   * (used for comparison after recording a new set).
+   * @param {string} exerciseName
+   * @param {string} excludeSessionId — exclude current session
+   * @returns {Promise<{ reps: number, weight_kg: number|null }|null>}
+   */
+  async findLastSetForExercise(exerciseName, excludeSessionId) {
+    return db('workout_session_sets as s')
+      .join('workout_sessions as ws', 's.session_id', 'ws.id')
+      .where('s.exercise_name', exerciseName)
+      .where('s.is_completed', true)
+      .where('ws.status', 'completed')
+      .whereNot('s.session_id', excludeSessionId)
+      .orderBy('s.completed_at', 'desc')
+      .select('s.reps', 's.weight_kg')
+      .first();
+  },
 };
 
 module.exports = sessionRepository;

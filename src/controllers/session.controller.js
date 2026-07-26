@@ -66,8 +66,8 @@ const sessionController = {
     validate(recordSetSchema),
     async (req, res, next) => {
       try {
-        const set = await sessionService.recordSet(req.params.id, req.params.setId, req.body);
-        return res.status(200).json(set);
+        const result = await sessionService.recordSet(req.params.id, req.params.setId, req.body);
+        return res.status(200).json(result); // { set, comparison }
       } catch (err) { next(err); }
     },
   ],
