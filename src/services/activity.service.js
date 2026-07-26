@@ -26,7 +26,7 @@ const activityService = {
     if (!data.name || data.name.trim().length < 1) {
       throw new AppError('Activity name is required', 400);
     }
-    return activityRepository.findOrCreate(data.name.trim());
+    return activityRepository.findOrCreate(data.name.trim(), data.activityType);
   },
 };
 

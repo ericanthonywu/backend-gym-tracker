@@ -54,6 +54,8 @@ const sessionService = {
           weight_kg: null,
           default_reps: prev ? prev.reps : null,
           default_weight_kg: prev ? prev.weightKg : null,
+          default_duration_seconds: prev ? (prev.durationSeconds || null) : null,
+          activity_type: ex.activity_type || 'reps',
           is_skipped: false,
           is_completed: false,
           rest_duration_seconds: 120,
@@ -101,15 +103,43 @@ const sessionService = {
     if (set.is_skipped) throw new AppError('This set was skipped', 400);
     if (set.is_completed) throw new AppError('This set is already completed', 400);
 
-    // Look up previous session's data for this exercise (for comparison)
+    const isTimeBased = (set.activity_type || 'reps') === 'time';
+
+    // Look up previous session's data for comparison
     const prevSet = await sessionRepository.findLastSetForExercise(set.exercise_name, sessionId);
 
+    // For time-based: also fetch all-time best
+    let topRecord = null;
+    if (isTimeBased) {
+      topRecord = await sessionRepository.findBestDurationForExercise(set.exercise_name, sessionId);
+    }
+
     // Save the set
-    const updatedSet = await sessionRepository.completeSet(setId, { reps: data.reps, weightKg: data.weightKg });
+    const updatedSet = await sessionRepository.completeSet(setId, {
+      reps: data.reps || null,
+      weightKg: data.weightKg || null,
+      durationSeconds: data.durationSeconds || null,
+    });
 
     // Build comparison
     let comparison = null;
-    if (prevSet) {
+    if (isTimeBased) {
+      const prevDuration = prevSet ? (prevSet.duration_seconds || 0) : 0;
+      const newDuration = data.durationSeconds || 0;
+      const durationChange = newDuration - prevDuration;
+      let verdict = 'same';
+      if (durationChange > 0) verdict = 'improved';
+      else if (durationChange < 0) verdict = 'declined';
+
+      comparison = {
+        isTimeBased: true,
+        prevDurationSeconds: prevDuration,
+        durationChange,
+        topRecordSeconds: topRecord,
+        isNewTopRecord: topRecord !== null && newDuration > topRecord,
+        verdict,
+      };
+    } else if (prevSet) {
       const prevReps = prevSet.reps || 0;
       const prevWeight = prevSet.weight_kg ? parseFloat(prevSet.weight_kg) : 0;
       const newReps = data.reps || 0;
@@ -122,6 +152,7 @@ const sessionService = {
       else if (repsChange < 0 || weightChange < 0) verdict = 'declined';
 
       comparison = {
+        isTimeBased: false,
         prevReps,
         prevWeightKg: prevWeight,
         repsChange,

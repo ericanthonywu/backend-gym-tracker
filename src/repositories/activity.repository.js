@@ -56,6 +56,7 @@ const activityRepository = {
         name: data.name.trim(),
         category: data.category || null,
         muscle_group: data.muscleGroup || null,
+        activity_type: data.activityType || 'reps',
       })
       .returning('*');
     return row;
@@ -66,10 +67,10 @@ const activityRepository = {
    * @param {string} name
    * @returns {Promise<Object>}
    */
-  async findOrCreate(name) {
+  async findOrCreate(name, activityType) {
     const existing = await this.findByName(name);
     if (existing) return existing;
-    return this.create({ name });
+    return this.create({ name, activityType: activityType || 'reps' });
   },
 };
 

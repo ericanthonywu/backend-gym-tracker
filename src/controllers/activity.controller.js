@@ -8,6 +8,7 @@ const createSchema = Joi.object({
   name: Joi.string().min(1).max(255).required(),
   category: Joi.string().max(100).allow('', null).optional(),
   muscleGroup: Joi.string().max(100).allow('', null).optional(),
+  activityType: Joi.string().valid('reps', 'time').default('reps').optional(),
 });
 
 const activityController = {

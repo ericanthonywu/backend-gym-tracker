@@ -124,8 +124,9 @@ const sessionRepository = {
     const [row] = await db('workout_session_sets')
       .where({ id: setId })
       .update({
-        reps: data.reps,
+        reps: data.reps || null,
         weight_kg: data.weightKg || null,
+        duration_seconds: data.durationSeconds || null,
         is_completed: true,
         completed_at: new Date(),
       })
@@ -190,13 +191,17 @@ const sessionRepository = {
       .where('ws.status', 'completed')
       .whereNot('s.session_id', excludeSessionId)
       .orderBy('s.completed_at', 'desc')
-      .select('s.exercise_name', 's.reps', 's.weight_kg', 's.completed_at');
+      .select('s.exercise_name', 's.reps', 's.weight_kg', 's.duration_seconds', 's.completed_at');
 
     // For each exercise name, keep only the most recent completed set
     const map = new Map();
     for (const row of rows) {
       if (!map.has(row.exercise_name)) {
-        map.set(row.exercise_name, { reps: row.reps, weightKg: row.weight_kg ? parseFloat(row.weight_kg) : null });
+        map.set(row.exercise_name, {
+          reps: row.reps,
+          weightKg: row.weight_kg ? parseFloat(row.weight_kg) : null,
+          durationSeconds: row.duration_seconds || null,
+        });
       }
     }
     return map;
@@ -217,8 +222,27 @@ const sessionRepository = {
       .where('ws.status', 'completed')
       .whereNot('s.session_id', excludeSessionId)
       .orderBy('s.completed_at', 'desc')
-      .select('s.reps', 's.weight_kg')
+      .select('s.reps', 's.weight_kg', 's.duration_seconds')
       .first();
+  },
+
+  /**
+   * Get the all-time best (max) duration for a time-based exercise.
+   * @param {string} exerciseName
+   * @param {string} excludeSessionId
+   * @returns {Promise<number|null>}
+   */
+  async findBestDurationForExercise(exerciseName, excludeSessionId) {
+    const row = await db('workout_session_sets as s')
+      .join('workout_sessions as ws', 's.session_id', 'ws.id')
+      .where('s.exercise_name', exerciseName)
+      .where('s.is_completed', true)
+      .where('ws.status', 'completed')
+      .whereNot('s.session_id', excludeSessionId)
+      .whereNotNull('s.duration_seconds')
+      .max('s.duration_seconds as best')
+      .first();
+    return row && row.best !== null ? parseInt(row.best, 10) : null;
   },
 };
 

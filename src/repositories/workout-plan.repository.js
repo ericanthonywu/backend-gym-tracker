@@ -84,6 +84,8 @@ const workoutPlanRepository = {
       name: e.name,
       target_sets: e.targetSets,
       target_reps: e.targetReps,
+      activity_type: e.activityType || 'reps',
+      target_duration_seconds: e.targetDurationSeconds || null,
       sort_order: e.sortOrder,
       created_at: new Date(),
     }));

@@ -7,7 +7,9 @@ const validate = require('../middlewares/validator');
 const exerciseSchema = Joi.object({
   name: Joi.string().min(1).max(255).required(),
   targetSets: Joi.number().integer().min(1).max(20).default(4),
-  targetReps: Joi.number().integer().min(1).max(200).default(12),
+  targetReps: Joi.number().integer().min(0).max(200).default(12),
+  activityType: Joi.string().valid('reps', 'time').default('reps').optional(),
+  targetDurationSeconds: Joi.number().integer().min(1).max(3600).allow(null).optional(),
 });
 
 const createSchema = Joi.object({

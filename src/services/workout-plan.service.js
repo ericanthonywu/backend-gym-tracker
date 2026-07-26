@@ -45,7 +45,9 @@ const workoutPlanService = {
       planId: plan.id,
       name: e.name.trim(),
       targetSets: e.targetSets || 4,
-      targetReps: e.targetReps || 12,
+      targetReps: e.targetReps || 0,
+      activityType: e.activityType || 'reps',
+      targetDurationSeconds: e.targetDurationSeconds || null,
       sortOrder: i,
     }));
 
@@ -71,7 +73,9 @@ const workoutPlanService = {
       planId: id,
       name: e.name.trim(),
       targetSets: e.targetSets || 4,
-      targetReps: e.targetReps || 12,
+      targetReps: e.targetReps || 0,
+      activityType: e.activityType || 'reps',
+      targetDurationSeconds: e.targetDurationSeconds || null,
       sortOrder: i,
     }));
     const insertedExercises = await workoutPlanRepository.insertExercises(exercises);

@@ -11,8 +11,9 @@ const startSchema = Joi.object({
 });
 
 const recordSetSchema = Joi.object({
-  reps: Joi.number().integer().min(0).max(999).required(),
+  reps: Joi.number().integer().min(0).max(999).allow(null).optional(),
   weightKg: Joi.number().min(0).max(999).allow(null).optional(),
+  durationSeconds: Joi.number().integer().min(0).max(86400).allow(null).optional(),
 });
 
 const exerciseNameSchema = Joi.object({
