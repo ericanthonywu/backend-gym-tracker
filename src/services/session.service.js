@@ -262,6 +262,29 @@ const sessionService = {
   },
 
   /**
+   * Log a cardio session with duration, speed, and incline.
+   * @param {{ activityName: string, durationSeconds?: number, speed?: number, incline?: number, notes?: string }} data
+   * @returns {Promise<Object>}
+   */
+  async logCardio(data) {
+    const activityName = data.activityName || 'Cardio';
+    const now = new Date();
+    const session = await sessionRepository.createSession({
+      planName: activityName,
+      status: 'completed',
+      sessionType: 'cardio',
+      startedAt: now,
+      completedAt: now,
+      notes: data.notes || null,
+      cardioDurationSeconds: data.durationSeconds || null,
+      cardioSpeed: data.speed || null,
+      cardioIncline: data.incline || null,
+    });
+
+    return this._buildSessionDetail(session.id);
+  },
+
+  /**
    * Get full session detail by ID.
    * @param {string} sessionId
    */

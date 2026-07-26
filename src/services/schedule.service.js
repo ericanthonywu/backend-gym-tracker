@@ -88,11 +88,18 @@ const scheduleService = {
       };
     }
 
+    // Check if today already has a rest day session completed
+    const todayStart = now.clone().startOf('day').toDate();
+    const todayEnd = now.clone().endOf('day').toDate();
+    const todaySessions = await sessionRepository.findCompletedSessionsBetween(todayStart, todayEnd);
+    const hasRestDayToday = todaySessions.some((s) => s.session_type === 'rest_day');
+
     return {
       today: {
         dayOfWeek: dbDay,
         dayName,
-        isRestDay: scheduled ? scheduled.is_rest_day : false,
+        isRestDay: (scheduled ? scheduled.is_rest_day : false) || hasRestDayToday,
+        markedRestDayToday: hasRestDayToday,
         plan: todayPlan,
       },
       skippedBanner,
@@ -105,44 +112,78 @@ const scheduleService = {
    * Rest days are NEVER marked as skipped days.
    * Used by frontend notification engine to customize reminder copywriting.
    *
-   * @returns {Promise<{ yesterdaySkipped: boolean, yesterdayPlanName: string|null }>}
+   * @returns {Promise<{ yesterdaySkipped: boolean, yesterdayPlanName: string|null, wasRestDay: boolean }>}
    */
   async getNotificationCheck() {
     const now = moment.tz(TZ);
     const yesterday = now.clone().subtract(1, 'day');
-    const yesterdayStr = yesterday.format('YYYY-MM-DD');
     const dbDay = jsToDbDay(yesterday.day());
 
     // Check yesterday's schedule
     const scheduled = await scheduleRepository.findByDay(dbDay);
 
-    // If yesterday was a rest day (or no plan scheduled), it is NEVER marked as skipped!
-    if (!scheduled || scheduled.is_rest_day || !scheduled.plan_id) {
-      return {
-        yesterdaySkipped: false,
-        yesterdayPlanName: null,
-      };
-    }
-
-    // Yesterday was a scheduled workout day — check if a completed session was logged yesterday via repository
+    // Yesterday's completed sessions
     const yesterdayStart = yesterday.clone().startOf('day').toDate();
     const yesterdayEnd = yesterday.clone().endOf('day').toDate();
+    const completedSessions = await sessionRepository.findCompletedSessionsBetween(yesterdayStart, yesterdayEnd);
 
-    const completedSession = await sessionRepository.findCompletedBetween(yesterdayStart, yesterdayEnd);
+    const hasRestDay = completedSessions.some((s) => s.session_type === 'rest_day');
+    const hasGymSession = completedSessions.some((s) => s.session_type === 'gym');
 
-    if (completedSession) {
-      // Session was completed yesterday — not skipped!
+    // If yesterday was marked as a rest day (by session or weekly schedule)
+    if (hasRestDay || !scheduled || scheduled.is_rest_day || !scheduled.plan_id) {
       return {
         yesterdaySkipped: false,
         yesterdayPlanName: null,
+        wasRestDay: hasRestDay || (scheduled && scheduled.is_rest_day),
       };
     }
 
-    // Scheduled workout day with no completed session saved -> Marked as skipped!
+    // Yesterday was a scheduled gym workout day:
+    if (hasGymSession) {
+      // Gym session completed — not skipped!
+      return {
+        yesterdaySkipped: false,
+        yesterdayPlanName: null,
+        wasRestDay: false,
+      };
+    }
+
+    // Scheduled gym workout day with NO gym session and NO rest day mark (even if cardio was logged) -> Marked as skipped!
     return {
       yesterdaySkipped: true,
       yesterdayPlanName: scheduled.plan_name,
+      wasRestDay: false,
     };
+  },
+
+  /**
+   * Mark today as a Rest Day (creates a rest_day session for today).
+   * Does NOT alter the user's recurring weekly schedule template.
+   * @param {string} [notes]
+   * @returns {Promise<Object>}
+   */
+  async markRestDayToday(notes) {
+    const now = moment.tz(TZ);
+    const todayStart = now.clone().startOf('day').toDate();
+    const todayEnd = now.clone().endOf('day').toDate();
+
+    const existingSessions = await sessionRepository.findCompletedSessionsBetween(todayStart, todayEnd);
+    const existingRest = existingSessions.find((s) => s.session_type === 'rest_day');
+    if (existingRest) {
+      return existingRest; // Already marked rest day today
+    }
+
+    const session = await sessionRepository.createSession({
+      planName: 'Rest Day',
+      status: 'completed',
+      sessionType: 'rest_day',
+      notes: notes || 'Enjoying recovery day 🛋️',
+      startedAt: now.toDate(),
+      completedAt: now.toDate(),
+    });
+
+    return session;
   },
 
   /**

@@ -34,12 +34,14 @@ router.get('/schedule/notification-check', scheduleController.notificationCheck)
 router.put('/schedule', ...scheduleController.updateAll);
 router.post('/schedule/skip-today', scheduleController.skipToday);
 router.post('/schedule/dismiss-skip/:skipId', scheduleController.dismissSkip);
+router.post('/schedule/rest-today', scheduleController.restToday);
 
 // Workout Sessions
 router.get('/sessions/active', sessionController.getActive);
 router.get('/sessions/history', sessionController.history);
 router.get('/sessions/:id', sessionController.getById);
 router.post('/sessions/start', ...sessionController.start);
+router.post('/sessions/cardio', ...sessionController.logCardio);
 router.post('/sessions/:id/sets/:setId', ...sessionController.recordSet);
 router.post('/sessions/:id/skip', ...sessionController.skip);
 router.post('/sessions/:id/re-enable', ...sessionController.reEnable);

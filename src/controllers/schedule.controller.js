@@ -65,6 +65,14 @@ const scheduleController = {
       return res.status(204).send();
     } catch (err) { next(err); }
   },
+
+  /** POST /api/schedule/rest-today */
+  async restToday(req, res, next) {
+    try {
+      const session = await scheduleService.markRestDayToday(req.body ? req.body.notes : null);
+      return res.status(200).json(session);
+    } catch (err) { next(err); }
+  },
 };
 
 module.exports = scheduleController;

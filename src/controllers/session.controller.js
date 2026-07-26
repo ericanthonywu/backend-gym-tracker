@@ -24,6 +24,14 @@ const completeSchema = Joi.object({
   notes: Joi.string().max(1000).allow('', null).optional(),
 });
 
+const cardioSchema = Joi.object({
+  activityName: Joi.string().min(1).max(255).default('Cardio'),
+  durationSeconds: Joi.number().integer().min(0).max(86400).allow(null).optional(),
+  speed: Joi.number().min(0).max(100).allow(null).optional(),
+  incline: Joi.number().min(0).max(50).allow(null).optional(),
+  notes: Joi.string().max(1000).allow('', null).optional(),
+});
+
 const sessionController = {
   /** GET /api/sessions/active */
   async getActive(req, res, next) {
@@ -129,6 +137,17 @@ const sessionController = {
       return res.status(204).send();
     } catch (err) { next(err); }
   },
+
+  /** POST /api/sessions/cardio */
+  logCardio: [
+    validate(cardioSchema),
+    async (req, res, next) => {
+      try {
+        const session = await sessionService.logCardio(req.body);
+        return res.status(201).json(session);
+      } catch (err) { next(err); }
+    },
+  ],
 };
 
 module.exports = sessionController;

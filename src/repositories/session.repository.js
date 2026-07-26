@@ -27,7 +27,19 @@ const sessionRepository = {
   },
 
   /**
-   * @param {{ planId: string|null, planName: string, wasMakeUpSession: boolean }} data
+   * @param {{
+   *   planId?: string|null,
+   *   planName: string,
+   *   status?: string,
+   *   startedAt?: Date,
+   *   completedAt?: Date,
+   *   notes?: string,
+   *   wasMakeUpSession?: boolean,
+   *   sessionType?: string,
+   *   cardioDurationSeconds?: number|null,
+   *   cardioSpeed?: number|null,
+   *   cardioIncline?: number|null
+   * }} data
    * @returns {Promise<Object>}
    */
   async createSession(data) {
@@ -35,9 +47,15 @@ const sessionRepository = {
       .insert({
         plan_id: data.planId || null,
         plan_name: data.planName,
-        status: 'active',
-        started_at: new Date(),
+        status: data.status || 'active',
+        started_at: data.startedAt || new Date(),
+        completed_at: data.completedAt || (data.status === 'completed' ? new Date() : null),
+        notes: data.notes || null,
         was_make_up_session: data.wasMakeUpSession || false,
+        session_type: data.sessionType || 'gym',
+        cardio_duration_seconds: data.cardioDurationSeconds || null,
+        cardio_speed: data.cardioSpeed || null,
+        cardio_incline: data.cardioIncline || null,
       })
       .returning('*');
     return row;
@@ -78,6 +96,19 @@ const sessionRepository = {
       .where('completed_at', '>=', startDate)
       .where('completed_at', '<=', endDate)
       .first();
+  },
+
+  /**
+   * Find all completed sessions completed between two timestamps.
+   * @param {Date} startDate
+   * @param {Date} endDate
+   * @returns {Promise<Array>}
+   */
+  async findCompletedSessionsBetween(startDate, endDate) {
+    return db('workout_sessions')
+      .where({ status: 'completed' })
+      .where('completed_at', '>=', startDate)
+      .where('completed_at', '<=', endDate);
   },
 
   /**
