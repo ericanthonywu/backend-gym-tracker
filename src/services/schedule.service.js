@@ -88,11 +88,12 @@ const scheduleService = {
       };
     }
 
-    // Check if today already has a rest day session completed
+    // Check if today already has a completed session (gym or rest day)
     const todayStart = now.clone().startOf('day').toDate();
     const todayEnd = now.clone().endOf('day').toDate();
     const todaySessions = await sessionRepository.findCompletedSessionsBetween(todayStart, todayEnd);
     const hasRestDayToday = todaySessions.some((s) => s.session_type === 'rest_day');
+    const completedToday = todaySessions.some((s) => s.session_type === 'gym' || s.session_type === 'rest_day');
 
     return {
       today: {
@@ -100,6 +101,7 @@ const scheduleService = {
         dayName,
         isRestDay: (scheduled ? scheduled.is_rest_day : false) || hasRestDayToday,
         markedRestDayToday: hasRestDayToday,
+        completedToday,
         plan: todayPlan,
       },
       skippedBanner,
