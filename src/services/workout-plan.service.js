@@ -1,6 +1,7 @@
 'use strict';
 
 const workoutPlanRepository = require('../repositories/workout-plan.repository');
+const activityRepository = require('../repositories/activity.repository');
 const AppError = require('../utils/app-error');
 
 /**
@@ -35,7 +36,7 @@ const workoutPlanService = {
   },
 
   /**
-   * @param {{ name: string, exercises: Array<{ name: string, targetSets: number, targetReps: number }> }} data
+   * @param {{ name: string, exercises: Array<{ name: string, targetSets: number, targetReps: number, activityType?: string }> }} data
    * @returns {Promise<Object>} created plan with exercises
    */
   async create(data) {
@@ -50,6 +51,10 @@ const workoutPlanService = {
       targetDurationSeconds: e.targetDurationSeconds || null,
       sortOrder: i,
     }));
+
+    for (const e of exercises) {
+      await activityRepository.findOrCreate(e.name, e.activityType);
+    }
 
     const insertedExercises = await workoutPlanRepository.insertExercises(exercises);
     return { ...plan, exercises: insertedExercises };
@@ -78,6 +83,11 @@ const workoutPlanService = {
       targetDurationSeconds: e.targetDurationSeconds || null,
       sortOrder: i,
     }));
+
+    for (const e of exercises) {
+      await activityRepository.findOrCreate(e.name, e.activityType);
+    }
+
     const insertedExercises = await workoutPlanRepository.insertExercises(exercises);
     return { ...plan, exercises: insertedExercises };
   },

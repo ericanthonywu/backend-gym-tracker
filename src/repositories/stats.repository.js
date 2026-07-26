@@ -50,6 +50,8 @@ const statsRepository = {
         db.raw("MAX(s.weight_kg) as max_weight_kg"),
         db.raw("SUM(s.reps) as total_reps"),
         db.raw("ROUND(AVG(s.reps), 1) as avg_reps"),
+        db.raw("SUM(s.duration_seconds) as total_duration_seconds"),
+        db.raw("MAX(s.duration_seconds) as max_duration_seconds"),
         db.raw("COUNT(s.id) as set_count"),
       );
 
@@ -58,6 +60,8 @@ const statsRepository = {
       maxWeightKg: r.max_weight_kg ? parseFloat(r.max_weight_kg) : null,
       totalReps: parseInt(r.total_reps, 10) || 0,
       avgReps: parseFloat(r.avg_reps) || 0,
+      totalDurationSeconds: r.total_duration_seconds ? parseInt(r.total_duration_seconds, 10) : null,
+      maxDurationSeconds: r.max_duration_seconds ? parseInt(r.max_duration_seconds, 10) : null,
       setCount: parseInt(r.set_count, 10) || 0,
     }));
   },
@@ -65,7 +69,7 @@ const statsRepository = {
   /**
    * Personal bests for an exercise.
    * @param {string} exerciseName
-   * @returns {Promise<{ bestWeightKg: number|null, bestReps: number|null, totalSessions: number }>}
+   * @returns {Promise<{ bestWeightKg: number|null, bestReps: number|null, bestDurationSeconds: number|null, totalSessions: number, activityType: string }>}
    */
   async findPersonalBests(exerciseName) {
     const [row] = await db('workout_session_sets as s')
@@ -76,13 +80,27 @@ const statsRepository = {
       .select(
         db.raw("MAX(s.weight_kg) as best_weight_kg"),
         db.raw("MAX(s.reps) as best_reps"),
+        db.raw("MAX(s.duration_seconds) as best_duration_seconds"),
         db.raw("COUNT(DISTINCT ws.id) as total_sessions"),
+        db.raw("MAX(s.activity_type) as set_activity_type"),
       );
 
+    const master = await db('master_activities')
+      .whereRaw('lower(name) = lower(?)', [exerciseName.trim()])
+      .first();
+
+    const hasDuration = row && row.best_duration_seconds != null && parseInt(row.best_duration_seconds, 10) > 0;
+    const isTimeBased =
+      (master && master.activity_type === 'time') ||
+      (row && row.set_activity_type === 'time') ||
+      hasDuration;
+
     return {
-      bestWeightKg: row.best_weight_kg ? parseFloat(row.best_weight_kg) : null,
-      bestReps: row.best_reps ? parseInt(row.best_reps, 10) : null,
-      totalSessions: parseInt(row.total_sessions, 10) || 0,
+      bestWeightKg: row && row.best_weight_kg ? parseFloat(row.best_weight_kg) : null,
+      bestReps: row && row.best_reps ? parseInt(row.best_reps, 10) : null,
+      bestDurationSeconds: hasDuration ? parseInt(row.best_duration_seconds, 10) : null,
+      totalSessions: row ? parseInt(row.total_sessions, 10) || 0 : 0,
+      activityType: isTimeBased ? 'time' : 'reps',
     };
   },
 };

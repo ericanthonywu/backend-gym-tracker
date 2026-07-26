@@ -69,7 +69,15 @@ const activityRepository = {
    */
   async findOrCreate(name, activityType) {
     const existing = await this.findByName(name);
-    if (existing) return existing;
+    if (existing) {
+      if (activityType && existing.activity_type !== activityType) {
+        await db('master_activities')
+          .where({ id: existing.id })
+          .update({ activity_type: activityType });
+        existing.activity_type = activityType;
+      }
+      return existing;
+    }
     return this.create({ name, activityType: activityType || 'reps' });
   },
 };
