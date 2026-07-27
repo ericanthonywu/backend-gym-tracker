@@ -8,9 +8,9 @@ const workoutPlanController = require('../controllers/workout-plan.controller');
 const scheduleController = require('../controllers/schedule.controller');
 const sessionController = require('../controllers/session.controller');
 const weightController = require('../controllers/weight.controller');
-const mealController = require('../controllers/meal.controller');
 const activityController = require('../controllers/activity.controller');
 const statsController = require('../controllers/stats.controller');
+const menstruationController = require('../controllers/menstruation.controller');
 
 const router = Router();
 
@@ -58,14 +58,11 @@ router.get('/weight', weightController.list);
 router.post('/weight', ...weightController.log);
 router.delete('/weight/:id', weightController.delete);
 
-// Meals
-router.get('/meals/settings', mealController.getSettings);
-router.post('/meals/settings', ...mealController.addSetting);
-router.patch('/meals/settings/:id', ...mealController.updateSetting);
-router.delete('/meals/settings/:id', mealController.deleteSetting);
-router.get('/meals/today', mealController.getToday);
-router.patch('/meals/toggle', ...mealController.toggle);
-router.get('/meals/summary', mealController.getSummary);
+// Menstruation
+router.get('/menstruation', menstruationController.list);
+router.post('/menstruation', ...menstruationController.log);
+router.put('/menstruation/:id', ...menstruationController.update);
+router.delete('/menstruation/:id', menstruationController.delete);
 
 // Master Activities
 router.get('/activities', activityController.list);
