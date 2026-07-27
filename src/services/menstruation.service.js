@@ -1,34 +1,21 @@
 'use strict';
 
 const menstruationRepo = require('../repositories/menstruation.repository');
+const AppError = require('../utils/app-error');
 
 const menstruationService = {
-  async listByUser(userId) {
-    return menstruationRepo.findAllByUser(userId);
+  async listAll() {
+    return menstruationRepo.findAll();
   },
 
-  async create(userId, data) {
-    const payload = {
-      user_id: userId,
-      start_date: data.start_date,
-      end_date: data.end_date || null,
-      flow_intensity: data.flow_intensity || null,
-      notes: data.notes || null,
-    };
-    return menstruationRepo.create(payload);
+  async create(data) {
+    return menstruationRepo.create(data);
   },
 
-  async update(userId, id, data) {
+  async update(id, data) {
     const existing = await menstruationRepo.findById(id);
     if (!existing) {
-      const error = new Error('Record not found');
-      error.status = 404;
-      throw error;
-    }
-    if (existing.user_id !== userId) {
-      const error = new Error('Forbidden');
-      error.status = 403;
-      throw error;
+      throw new AppError('Record not found', 404);
     }
 
     const payload = {};
@@ -40,17 +27,10 @@ const menstruationService = {
     return menstruationRepo.update(id, payload);
   },
 
-  async delete(userId, id) {
+  async delete(id) {
     const existing = await menstruationRepo.findById(id);
     if (!existing) {
-      const error = new Error('Record not found');
-      error.status = 404;
-      throw error;
-    }
-    if (existing.user_id !== userId) {
-      const error = new Error('Forbidden');
-      error.status = 403;
-      throw error;
+      throw new AppError('Record not found', 404);
     }
 
     await menstruationRepo.delete(id);

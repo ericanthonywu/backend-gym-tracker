@@ -6,14 +6,14 @@ const validate = require('../middlewares/validator');
 
 const logSchema = Joi.object({
   start_date: Joi.string().isoDate().required(),
-  end_date: Joi.string().isoDate().allow(null).optional(),
+  end_date: Joi.string().isoDate().allow(null, '').optional(),
   flow_intensity: Joi.string().allow(null, '').optional(),
   notes: Joi.string().allow(null, '').optional(),
 });
 
 const updateSchema = Joi.object({
   start_date: Joi.string().isoDate().optional(),
-  end_date: Joi.string().isoDate().allow(null).optional(),
+  end_date: Joi.string().isoDate().allow(null, '').optional(),
   flow_intensity: Joi.string().allow(null, '').optional(),
   notes: Joi.string().allow(null, '').optional(),
 });
@@ -21,7 +21,7 @@ const updateSchema = Joi.object({
 const menstruationController = {
   async list(req, res, next) {
     try {
-      const records = await menstruationService.listByUser(req.user.id);
+      const records = await menstruationService.listAll();
       return res.json({ data: records });
     } catch (error) {
       next(error);
@@ -32,7 +32,7 @@ const menstruationController = {
     validate(logSchema),
     async (req, res, next) => {
       try {
-        const newRecord = await menstruationService.create(req.user.id, req.body);
+        const newRecord = await menstruationService.create(req.body);
         return res.status(201).json({ data: newRecord });
       } catch (error) {
         next(error);
@@ -44,7 +44,7 @@ const menstruationController = {
     validate(updateSchema),
     async (req, res, next) => {
       try {
-        const updated = await menstruationService.update(req.user.id, req.params.id, req.body);
+        const updated = await menstruationService.update(req.params.id, req.body);
         return res.json({ data: updated });
       } catch (error) {
         next(error);
@@ -54,7 +54,7 @@ const menstruationController = {
 
   async delete(req, res, next) {
     try {
-      await menstruationService.delete(req.user.id, req.params.id);
+      await menstruationService.delete(req.params.id);
       return res.json({ message: 'Deleted successfully' });
     } catch (error) {
       next(error);

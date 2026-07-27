@@ -4,9 +4,8 @@ const db = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 
 const menstruationRepository = {
-  async findAllByUser(userId) {
+  async findAll() {
     return db('menstruation_logs')
-      .where({ user_id: userId })
       .orderBy('start_date', 'desc');
   },
 
@@ -16,23 +15,27 @@ const menstruationRepository = {
 
   async create(data) {
     const id = uuidv4();
-    await db('menstruation_logs').insert({
-      id,
-      ...data,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
-    return this.findById(id);
+    const [row] = await db('menstruation_logs')
+      .insert({
+        id,
+        start_date: data.start_date,
+        end_date: data.end_date || null,
+        flow_intensity: data.flow_intensity || null,
+        notes: data.notes || null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
+      .returning('*');
+    return row;
   },
 
   async update(id, data) {
-    await db('menstruation_logs')
+    const updates = { ...data, updated_at: new Date() };
+    const [row] = await db('menstruation_logs')
       .where({ id })
-      .update({
-        ...data,
-        updated_at: new Date(),
-      });
-    return this.findById(id);
+      .update(updates)
+      .returning('*');
+    return row;
   },
 
   async delete(id) {
