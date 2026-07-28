@@ -80,7 +80,30 @@ const scheduleService = {
     // Build today's plan object
     let todayPlan = null;
     if (scheduled && !scheduled.is_rest_day && scheduled.plan_id) {
-      const exercises = await workoutPlanRepository.findExercises(scheduled.plan_id);
+      let exercises = [];
+      const lastSession = await sessionRepository.findLastCompletedByPlan(scheduled.plan_id);
+      if (lastSession) {
+        const lastSets = await sessionRepository.findSets(lastSession.id);
+        const uniqueMap = new Map();
+        for (const set of lastSets) {
+          if (!uniqueMap.has(set.exercise_name)) {
+            uniqueMap.set(set.exercise_name, {
+              id: set.id,
+              name: set.exercise_name,
+              target_sets: 1,
+              target_reps: set.target_reps || 12,
+              target_duration_seconds: set.target_duration_seconds || null,
+              activity_type: set.target_duration_seconds ? 'time' : 'reps',
+            });
+          } else {
+            uniqueMap.get(set.exercise_name).target_sets += 1;
+          }
+        }
+        exercises = Array.from(uniqueMap.values());
+      }
+      if (!exercises.length) {
+        exercises = await workoutPlanRepository.findExercises(scheduled.plan_id);
+      }
       todayPlan = {
         id: scheduled.plan_id,
         name: scheduled.plan_name,
