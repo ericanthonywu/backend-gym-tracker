@@ -77,9 +77,43 @@ const scheduleService = {
       };
     }
 
-    // Build today's plan object
+    // Check if today has any sessions (active or completed)
+    const todayStart = now.clone().startOf('day').toDate();
+    const todayEnd = now.clone().endOf('day').toDate();
+    const todaySessions = await sessionRepository.findCompletedSessionsBetween(todayStart, todayEnd);
+    const activeSession = await sessionRepository.findActive();
+
+    // Priority for today's activity: active session -> completed gym session -> scheduled plan
+    const gymSessionToday = (activeSession && activeSession.session_type === 'gym' ? activeSession : null) || 
+                            todaySessions.find((s) => s.session_type === 'gym');
+    const hasRestDayToday = todaySessions.some((s) => s.session_type === 'rest_day');
+    const completedToday = todaySessions.some((s) => s.session_type === 'gym' || s.session_type === 'rest_day');
     let todayPlan = null;
-    if (scheduled && !scheduled.is_rest_day && scheduled.plan_id) {
+
+    if (gymSessionToday) {
+      // Activity exists today! Use this activity's plan and exercises for the dashboard
+      const sets = await sessionRepository.findSets(gymSessionToday.id);
+      const uniqueMap = new Map();
+      for (const set of sets) {
+        if (!uniqueMap.has(set.exercise_name)) {
+          uniqueMap.set(set.exercise_name, {
+            id: set.id,
+            name: set.exercise_name,
+            target_sets: 1,
+            target_reps: set.target_reps || 12,
+            target_duration_seconds: set.duration_seconds || null,
+            activity_type: set.duration_seconds ? 'time' : 'reps',
+          });
+        } else {
+          uniqueMap.get(set.exercise_name).target_sets += 1;
+        }
+      }
+      todayPlan = {
+        id: gymSessionToday.plan_id || gymSessionToday.id,
+        name: gymSessionToday.plan_name,
+        exercises: Array.from(uniqueMap.values()),
+      };
+    } else if (scheduled && !scheduled.is_rest_day && scheduled.plan_id) {
       let exercises = [];
       const lastSession = await sessionRepository.findLastCompletedByPlan(scheduled.plan_id);
       if (lastSession) {
@@ -92,8 +126,8 @@ const scheduleService = {
               name: set.exercise_name,
               target_sets: 1,
               target_reps: set.target_reps || 12,
-              target_duration_seconds: set.target_duration_seconds || null,
-              activity_type: set.target_duration_seconds ? 'time' : 'reps',
+              target_duration_seconds: set.duration_seconds || null,
+              activity_type: set.duration_seconds ? 'time' : 'reps',
             });
           } else {
             uniqueMap.get(set.exercise_name).target_sets += 1;
@@ -111,18 +145,15 @@ const scheduleService = {
       };
     }
 
-    // Check if today already has a completed session (gym or rest day)
-    const todayStart = now.clone().startOf('day').toDate();
-    const todayEnd = now.clone().endOf('day').toDate();
-    const todaySessions = await sessionRepository.findCompletedSessionsBetween(todayStart, todayEnd);
-    const hasRestDayToday = todaySessions.some((s) => s.session_type === 'rest_day');
-    const completedToday = todaySessions.some((s) => s.session_type === 'gym' || s.session_type === 'rest_day');
+    const isRestDay = gymSessionToday
+      ? false
+      : ((scheduled ? scheduled.is_rest_day : false) || hasRestDayToday);
 
     return {
       today: {
         dayOfWeek: dbDay,
         dayName,
-        isRestDay: (scheduled ? scheduled.is_rest_day : false) || hasRestDayToday,
+        isRestDay,
         markedRestDayToday: hasRestDayToday,
         completedToday,
         plan: todayPlan,
