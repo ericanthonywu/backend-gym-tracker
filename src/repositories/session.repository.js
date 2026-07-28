@@ -139,6 +139,17 @@ const sessionRepository = {
     return db('workout_session_sets')
       .where({ session_id: sessionId })
       .orderBy([{ column: 'sort_order', order: 'asc' }, { column: 'set_number', order: 'asc' }]);
+  /**
+   * Reorder exercises in an active session by updating sort_order for each set of each exercise.
+   * @param {string} sessionId
+   * @param {Array<string>} exerciseNames
+   */
+  async reorderExercises(sessionId, exerciseNames) {
+    for (let i = 0; i < exerciseNames.length; i++) {
+      await db('workout_session_sets')
+        .where({ session_id: sessionId, exercise_name: exerciseNames[i] })
+        .update({ sort_order: i });
+    }
   },
 
   /**

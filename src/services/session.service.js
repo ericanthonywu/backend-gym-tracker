@@ -156,6 +156,21 @@ const sessionService = {
   },
 
   /**
+   * Reorder exercises in an active session.
+   * @param {string} sessionId
+   * @param {Array<string>} exerciseNames
+   * @returns {Promise<Object>} updated session detail
+   */
+  async reorderExercises(sessionId, exerciseNames) {
+    const session = await sessionRepository.findById(sessionId);
+    if (!session || session.status !== 'active') {
+      throw new AppError('Active session not found', 404);
+    }
+    await sessionRepository.reorderExercises(sessionId, exerciseNames);
+    return this._buildSessionDetail(sessionId);
+  },
+
+  /**
    * Get the currently active session.
    * @returns {Promise<Object>}
    * @throws {AppError} 404 if no active session

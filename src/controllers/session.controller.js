@@ -195,6 +195,19 @@ const sessionController = {
         return res.status(200).json(session);
       } catch (err) { next(err); }
     },
+  /** POST /api/sessions/:id/reorder-exercises
+   *  Reorder exercises in an active session.
+   */
+  reorderExercises: [
+    validate(Joi.object({
+      exerciseNames: Joi.array().items(Joi.string().required()).min(1).required(),
+    })),
+    async (req, res, next) => {
+      try {
+        const session = await sessionService.reorderExercises(req.params.id, req.body.exerciseNames);
+        return res.status(200).json(session);
+      } catch (err) { next(err); }
+    },
   ],
 };
 
