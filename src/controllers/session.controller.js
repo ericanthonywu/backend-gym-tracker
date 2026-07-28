@@ -195,6 +195,8 @@ const sessionController = {
         return res.status(200).json(session);
       } catch (err) { next(err); }
     },
+  ],
+
   /** POST /api/sessions/:id/reorder-exercises
    *  Reorder exercises in an active session.
    */
