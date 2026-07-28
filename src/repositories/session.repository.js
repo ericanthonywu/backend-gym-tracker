@@ -289,6 +289,19 @@ const sessionRepository = {
       .first();
     return row && row.best !== null ? parseInt(row.best, 10) : null;
   },
+
+  /**
+   * Find the most recent completed gym session for a given plan.
+   * Used by the dashboard to show last workout history instead of the plan template.
+   * @param {string} planId
+   * @returns {Promise<Object|null>}
+   */
+  async findLastCompletedByPlan(planId) {
+    return db('workout_sessions')
+      .where({ plan_id: planId, status: 'completed', session_type: 'gym' })
+      .orderBy('completed_at', 'desc')
+      .first();
+  },
 };
 
 module.exports = sessionRepository;

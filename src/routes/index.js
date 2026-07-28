@@ -39,6 +39,7 @@ router.post('/schedule/rest-today', scheduleController.restToday);
 // Workout Sessions
 router.get('/sessions/active', sessionController.getActive);
 router.get('/sessions/history', sessionController.history);
+router.get('/sessions/last-by-plan/:planId', sessionController.lastByPlan);
 router.get('/sessions/:id', sessionController.getById);
 router.post('/sessions/start', ...sessionController.start);
 router.post('/sessions/cardio', ...sessionController.logCardio);
@@ -46,6 +47,7 @@ router.post('/sessions/:id/sets/:setId', ...sessionController.recordSet);
 router.post('/sessions/:id/skip', ...sessionController.skip);
 router.post('/sessions/:id/re-enable', ...sessionController.reEnable);
 router.get('/sessions/:id/skipped-exercises', sessionController.getSkipped);
+router.post('/sessions/:id/add-exercise', ...sessionController.addExercise);
 router.post('/sessions/:id/complete', ...sessionController.complete);
 router.post('/sessions/:id/cancel', sessionController.cancel);
 router.delete('/sessions/:id', sessionController.delete);

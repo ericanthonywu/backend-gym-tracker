@@ -10,28 +10,61 @@ const AppError = require('../utils/app-error');
  */
 const sessionService = {
   /**
-   * Start a new workout session from a plan.
-   * Pre-generates all sets for every exercise so the UI can track them.
+   * Start a new workout session.
+   * Supports three modes:
+   *   1. Plan-based (planId only): load exercises from plan template
+   *   2. Custom plan (planId + exercises): use the provided exercise list (user modified the plan)
+   *   3. Free-form (no planId, exercises + planName): "Quick Workout" with no plan
    *
-   * @param {{ planId: string, wasMakeUpSession?: boolean, skipId?: string }} data
+   * @param {{
+   *   planId?: string|null,
+   *   planName?: string|null,
+   *   wasMakeUpSession?: boolean,
+   *   skipId?: string,
+   *   exercises?: Array<{ name, targetSets, targetReps, activityType?, targetDurationSeconds? }>
+   * }} data
    * @returns {Promise<Object>} session with all pre-generated sets
-   * @throws {AppError} 400 if there's already an active session
-   * @throws {AppError} 404 if plan not found
    */
   async start(data) {
     // Prevent concurrent active sessions
     const existing = await sessionRepository.findActive();
     if (existing) throw new AppError('You already have an active workout session! Finish it first.', 400);
 
-    const plan = await workoutPlanRepository.findById(data.planId);
-    if (!plan) throw new AppError('Workout plan not found', 404);
+    let planId = data.planId || null;
+    let planName = data.planName || null;
+    let exercises = data.exercises || null; // inline exercise list (custom or quick workout)
 
-    const exercises = await workoutPlanRepository.findExercises(data.planId);
-    if (!exercises.length) throw new AppError('This plan has no exercises yet. Add some first!', 400);
+    if (planId) {
+      // Plan-based session (mode 1 or 2)
+      const plan = await workoutPlanRepository.findById(planId);
+      if (!plan) throw new AppError('Workout plan not found', 404);
+      planName = plan.name;
+
+      // If no inline exercises provided, load from plan template (mode 1)
+      if (!exercises || exercises.length === 0) {
+        const planExercises = await workoutPlanRepository.findExercises(planId);
+        if (!planExercises.length) throw new AppError('This plan has no exercises yet. Add some first!', 400);
+        exercises = planExercises.map((ex) => ({
+          name: ex.name,
+          targetSets: ex.target_sets,
+          targetReps: ex.target_reps || 0,
+          activityType: ex.activity_type || 'reps',
+          targetDurationSeconds: ex.target_duration_seconds || null,
+        }));
+      }
+    } else {
+      // Free-form / Quick Workout (mode 3)
+      if (!exercises || exercises.length === 0) {
+        throw new AppError('Please add at least one exercise to start a workout.', 400);
+      }
+      if (!planName || planName.trim() === '') {
+        planName = 'Quick Workout';
+      }
+    }
 
     const session = await sessionRepository.createSession({
-      planId: plan.id,
-      planName: plan.name,
+      planId,
+      planName,
       wasMakeUpSession: data.wasMakeUpSession || false,
     });
 
@@ -44,7 +77,7 @@ const sessionService = {
 
     exercises.forEach((ex, exIndex) => {
       const prev = lastSets.get(ex.name) || null;
-      for (let s = 1; s <= ex.target_sets; s++) {
+      for (let s = 1; s <= ex.targetSets; s++) {
         sets.push({
           session_id: session.id,
           exercise_name: ex.name,
@@ -55,7 +88,7 @@ const sessionService = {
           default_reps: prev ? prev.reps : null,
           default_weight_kg: prev ? prev.weightKg : null,
           default_duration_seconds: prev ? (prev.durationSeconds || null) : null,
-          activity_type: ex.activity_type || 'reps',
+          activity_type: ex.activityType || 'reps',
           is_skipped: false,
           is_completed: false,
           rest_duration_seconds: 120,
@@ -75,6 +108,54 @@ const sessionService = {
   },
 
   /**
+   * Add a new exercise to an already-active session (mid-session).
+   * Creates all pre-generated sets for the exercise using smart defaults.
+   *
+   * @param {string} sessionId
+   * @param {{ name, targetSets, targetReps, activityType?, targetDurationSeconds? }} exerciseData
+   * @returns {Promise<Object>} updated session detail
+   */
+  async addExercise(sessionId, exerciseData) {
+    const session = await sessionRepository.findById(sessionId);
+    if (!session) throw new AppError('Session not found', 404);
+    if (session.status !== 'active') throw new AppError('This session is no longer active', 400);
+
+    // Determine the next sort_order (after existing exercises)
+    const existingSets = await sessionRepository.findSets(sessionId);
+    const maxSortOrder = existingSets.length > 0
+      ? Math.max(...existingSets.map((s) => s.sort_order))
+      : -1;
+    const newSortOrder = maxSortOrder + 1;
+
+    // Look up previous performance for smart defaults
+    const lastSets = await sessionRepository.findLastCompletedSets([exerciseData.name], sessionId);
+    const prev = lastSets.get(exerciseData.name) || null;
+
+    const sets = [];
+    for (let s = 1; s <= exerciseData.targetSets; s++) {
+      sets.push({
+        session_id: sessionId,
+        exercise_name: exerciseData.name,
+        sort_order: newSortOrder,
+        set_number: s,
+        reps: null,
+        weight_kg: null,
+        default_reps: prev ? prev.reps : null,
+        default_weight_kg: prev ? prev.weightKg : null,
+        default_duration_seconds: prev ? (prev.durationSeconds || null) : null,
+        activity_type: exerciseData.activityType || 'reps',
+        is_skipped: false,
+        is_completed: false,
+        rest_duration_seconds: 120,
+        completed_at: null,
+      });
+    }
+
+    await sessionRepository.insertSets(sets);
+    return this._buildSessionDetail(sessionId);
+  },
+
+  /**
    * Get the currently active session.
    * @returns {Promise<Object>}
    * @throws {AppError} 404 if no active session
@@ -82,6 +163,18 @@ const sessionService = {
   async getActive() {
     const session = await sessionRepository.findActive();
     if (!session) throw new AppError('No active workout session', 404);
+    return this._buildSessionDetail(session.id);
+  },
+
+  /**
+   * Get the most recent completed gym session for a given plan.
+   * Used by the dashboard to show last workout's exercises instead of the plan template.
+   * @param {string} planId
+   * @returns {Promise<Object|null>}
+   */
+  async getLastByPlan(planId) {
+    const session = await sessionRepository.findLastCompletedByPlan(planId);
+    if (!session) return null;
     return this._buildSessionDetail(session.id);
   },
 
@@ -166,9 +259,6 @@ const sessionService = {
 
   /**
    * Skip all remaining (incomplete) sets of an exercise.
-   * @param {string} sessionId
-   * @param {string} exerciseName
-   * @returns {Promise<Object>} session detail
    */
   async skipExercise(sessionId, exerciseName) {
     const session = await sessionRepository.findById(sessionId);
@@ -180,10 +270,7 @@ const sessionService = {
   },
 
   /**
-   * Re-enable a previously skipped exercise (user changes their mind at end of session).
-   * @param {string} sessionId
-   * @param {string} exerciseName
-   * @returns {Promise<Object>} session detail
+   * Re-enable a previously skipped exercise.
    */
   async reEnableExercise(sessionId, exerciseName) {
     const session = await sessionRepository.findById(sessionId);
@@ -194,9 +281,7 @@ const sessionService = {
   },
 
   /**
-   * Get names of skipped exercises in a session (used for end-of-session dialog).
-   * @param {string} sessionId
-   * @returns {Promise<string[]>}
+   * Get names of skipped exercises in a session.
    */
   async getSkippedExercises(sessionId) {
     return sessionRepository.findSkippedExerciseNames(sessionId);
@@ -204,9 +289,6 @@ const sessionService = {
 
   /**
    * Complete a session.
-   * @param {string} sessionId
-   * @param {{ notes?: string }} data
-   * @returns {Promise<Object>} completed session detail
    */
   async complete(sessionId, data) {
     const session = await sessionRepository.findById(sessionId);
@@ -224,7 +306,6 @@ const sessionService = {
 
   /**
    * Cancel an active session.
-   * @param {string} sessionId
    */
   async cancel(sessionId) {
     const session = await sessionRepository.findById(sessionId);
@@ -234,7 +315,6 @@ const sessionService = {
 
   /**
    * Delete a session and all its sets.
-   * @param {string} sessionId
    */
   async delete(sessionId) {
     const session = await sessionRepository.findById(sessionId);
@@ -244,13 +324,11 @@ const sessionService = {
 
   /**
    * Paginated session history.
-   * @param {{ page: number, limit: number }} opts
    */
   async history({ page = 1, limit = 20 } = {}) {
     const offset = (page - 1) * limit;
     const { data, total } = await sessionRepository.findHistory({ limit, offset });
 
-    // Attach full session detail (exercises & sets) to each history item
     const withDetail = await Promise.all(
       data.map(async (s) => {
         return this._buildSessionDetail(s.id);
@@ -262,8 +340,6 @@ const sessionService = {
 
   /**
    * Log a cardio session with duration, speed, and incline.
-   * @param {{ activityName: string, durationSeconds?: number, speed?: number, incline?: number, notes?: string }} data
-   * @returns {Promise<Object>}
    */
   async logCardio(data) {
     const activityName = data.activityName || 'Cardio';
@@ -285,7 +361,6 @@ const sessionService = {
 
   /**
    * Get full session detail by ID.
-   * @param {string} sessionId
    */
   async getById(sessionId) {
     const session = await sessionRepository.findById(sessionId);

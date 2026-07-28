@@ -4,10 +4,23 @@ const Joi = require('joi');
 const sessionService = require('../services/session.service');
 const validate = require('../middlewares/validator');
 
+// Plan-based start (planId required, but exercises may be provided to override the plan template)
 const startSchema = Joi.object({
-  planId: Joi.string().uuid().required(),
+  planId: Joi.string().uuid().allow(null).optional(),
+  planName: Joi.string().max(255).allow(null, '').optional(), // required when planId is null (free-form)
   wasMakeUpSession: Joi.boolean().default(false),
   skipId: Joi.string().uuid().allow(null).optional(),
+  // Optional: inline exercise list to override/replace the plan template.
+  // Each item: { name, targetSets, targetReps, activityType?, targetDurationSeconds? }
+  exercises: Joi.array().items(
+    Joi.object({
+      name: Joi.string().min(1).max(255).required(),
+      targetSets: Joi.number().integer().min(1).max(100).required(),
+      targetReps: Joi.number().integer().min(0).max(999).default(0),
+      activityType: Joi.string().valid('reps', 'time').default('reps'),
+      targetDurationSeconds: Joi.number().integer().min(0).max(86400).allow(null).optional(),
+    }),
+  ).optional(),
 });
 
 const recordSetSchema = Joi.object({
@@ -32,6 +45,14 @@ const cardioSchema = Joi.object({
   notes: Joi.string().max(1000).allow('', null).optional(),
 });
 
+const addExerciseSchema = Joi.object({
+  name: Joi.string().min(1).max(255).required(),
+  targetSets: Joi.number().integer().min(1).max(100).required(),
+  targetReps: Joi.number().integer().min(0).max(999).default(0),
+  activityType: Joi.string().valid('reps', 'time').default('reps'),
+  targetDurationSeconds: Joi.number().integer().min(0).max(86400).allow(null).optional(),
+});
+
 const sessionController = {
   /** GET /api/sessions/active */
   async getActive(req, res, next) {
@@ -51,6 +72,15 @@ const sessionController = {
     } catch (err) { next(err); }
   },
 
+  /** GET /api/sessions/last-by-plan/:planId */
+  async lastByPlan(req, res, next) {
+    try {
+      const session = await sessionService.getLastByPlan(req.params.planId);
+      if (!session) return res.status(404).json({ message: 'No previous session found for this plan' });
+      return res.status(200).json(session);
+    } catch (err) { next(err); }
+  },
+
   /** GET /api/sessions/:id */
   async getById(req, res, next) {
     try {
@@ -59,7 +89,12 @@ const sessionController = {
     } catch (err) { next(err); }
   },
 
-  /** POST /api/sessions/start */
+  /** POST /api/sessions/start
+   *  Supports:
+   *   - planId only → start session from plan template
+   *   - planId + exercises → start session with custom exercise list (overrides template)
+   *   - exercises + planName → free-form "quick workout" with no plan
+   */
   start: [
     validate(startSchema),
     async (req, res, next) => {
@@ -145,6 +180,19 @@ const sessionController = {
       try {
         const session = await sessionService.logCardio(req.body);
         return res.status(201).json(session);
+      } catch (err) { next(err); }
+    },
+  ],
+
+  /** POST /api/sessions/:id/add-exercise
+   *  Add a new exercise to an already-active session (mid-session custom addition).
+   */
+  addExercise: [
+    validate(addExerciseSchema),
+    async (req, res, next) => {
+      try {
+        const session = await sessionService.addExercise(req.params.id, req.body);
+        return res.status(200).json(session);
       } catch (err) { next(err); }
     },
   ],
