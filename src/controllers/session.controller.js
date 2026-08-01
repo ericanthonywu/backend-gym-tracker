@@ -211,6 +211,38 @@ const sessionController = {
       } catch (err) { next(err); }
     },
   ],
+
+  /** POST /api/sessions/:id/remove-exercise
+   *  Remove an exercise (pending sets only) from an active session.
+   */
+  removeExercise: [
+    validate(exerciseNameSchema),
+    async (req, res, next) => {
+      try {
+        const session = await sessionService.removeExercise(req.params.id, req.body.exerciseName);
+        return res.status(200).json(session);
+      } catch (err) { next(err); }
+    },
+  ],
+
+  /** POST /api/sessions/:id/edit-exercise
+   *  Edit an exercise's target sets/reps in an active session.
+   */
+  editExercise: [
+    validate(Joi.object({
+      exerciseName: Joi.string().min(1).max(255).required(),
+      targetSets: Joi.number().integer().min(1).max(100).required(),
+      targetReps: Joi.number().integer().min(0).max(999).default(0),
+      activityType: Joi.string().valid('reps', 'time').default('reps'),
+      targetDurationSeconds: Joi.number().integer().min(0).max(86400).allow(null).optional(),
+    })),
+    async (req, res, next) => {
+      try {
+        const session = await sessionService.editExercise(req.params.id, req.body);
+        return res.status(200).json(session);
+      } catch (err) { next(err); }
+    },
+  ],
 };
 
 module.exports = sessionController;

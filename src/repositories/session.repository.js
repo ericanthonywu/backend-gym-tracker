@@ -154,6 +154,41 @@ const sessionRepository = {
   },
 
   /**
+   * Delete all pending (incomplete) sets for a specific exercise in a session.
+   * Completed sets are preserved to maintain history integrity.
+   * @param {string} sessionId
+   * @param {string} exerciseName
+   * @returns {Promise<number>} number of rows deleted
+   */
+  async deleteSetsByExercise(sessionId, exerciseName) {
+    return db('workout_session_sets')
+      .where({ session_id: sessionId, exercise_name: exerciseName, is_completed: false })
+      .delete();
+  },
+
+  /**
+   * Delete specific sets by their IDs.
+   * @param {Array<string>} ids
+   * @returns {Promise<number>}
+   */
+  async deleteSetsByIds(ids) {
+    if (!ids.length) return 0;
+    return db('workout_session_sets').whereIn('id', ids).delete();
+  },
+
+  /**
+   * Find all sets for a specific exercise in a session.
+   * @param {string} sessionId
+   * @param {string} exerciseName
+   * @returns {Promise<Array>}
+   */
+  async findSetsByExercise(sessionId, exerciseName) {
+    return db('workout_session_sets')
+      .where({ session_id: sessionId, exercise_name: exerciseName })
+      .orderBy('set_number', 'asc');
+  },
+
+  /**
    * Bulk-insert pre-generated sets when a session starts.
    * @param {Array<Object>} sets
    * @returns {Promise<Array>}

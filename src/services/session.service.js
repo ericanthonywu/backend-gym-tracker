@@ -171,6 +171,97 @@ const sessionService = {
   },
 
   /**
+   * Remove an exercise from an active session.
+   * Only deletes pending (incomplete) sets — completed sets are preserved.
+   * Throws if all sets are already completed (nothing to remove).
+   * @param {string} sessionId
+   * @param {string} exerciseName
+   * @returns {Promise<Object>} updated session detail
+   */
+  async removeExercise(sessionId, exerciseName) {
+    const session = await sessionRepository.findById(sessionId);
+    if (!session) throw new AppError('Session not found', 404);
+    if (session.status !== 'active') throw new AppError('This session is no longer active', 400);
+
+    const sets = await sessionRepository.findSetsByExercise(sessionId, exerciseName);
+    if (!sets.length) throw new AppError('Exercise not found in this session', 404);
+
+    const completedCount = sets.filter((s) => s.is_completed).length;
+    if (completedCount === sets.length) {
+      throw new AppError('Cannot remove an exercise that has all sets completed', 400);
+    }
+
+    await sessionRepository.deleteSetsByExercise(sessionId, exerciseName);
+    return this._buildSessionDetail(sessionId);
+  },
+
+  /**
+   * Edit target sets/reps for an exercise in an active session.
+   * Adds new pending sets or trims excess pending ones while preserving completed sets.
+   * @param {string} sessionId
+   * @param {{ exerciseName, targetSets, targetReps, activityType, targetDurationSeconds? }} data
+   * @returns {Promise<Object>} updated session detail
+   */
+  async editExercise(sessionId, data) {
+    const session = await sessionRepository.findById(sessionId);
+    if (!session) throw new AppError('Session not found', 404);
+    if (session.status !== 'active') throw new AppError('This session is no longer active', 400);
+
+    const sets = await sessionRepository.findSetsByExercise(sessionId, data.exerciseName);
+    if (!sets.length) throw new AppError('Exercise not found in this session', 404);
+
+    const completedSets = sets.filter((s) => s.is_completed);
+    const pendingSets = sets.filter((s) => !s.is_completed);
+    const currentTotal = sets.length;
+    const targetTotal = data.targetSets;
+
+    // Determine the sort_order for this exercise (same as existing sets)
+    const sortOrder = sets[0].sort_order;
+
+    if (targetTotal > currentTotal) {
+      // Need more sets — add new pending ones starting from the next set_number
+      const lastSets = await sessionRepository.findLastCompletedSets([data.exerciseName], sessionId);
+      const prev = lastSets.get(data.exerciseName) || null;
+
+      const newSets = [];
+      for (let s = currentTotal + 1; s <= targetTotal; s++) {
+        newSets.push({
+          session_id: sessionId,
+          exercise_name: data.exerciseName,
+          sort_order: sortOrder,
+          set_number: s,
+          reps: null,
+          weight_kg: null,
+          default_reps: data.activityType === 'reps' ? (data.targetReps || (prev ? prev.reps : null)) : null,
+          default_weight_kg: prev ? prev.weightKg : null,
+          default_duration_seconds: data.activityType === 'time'
+            ? (data.targetDurationSeconds || (prev ? prev.durationSeconds : null))
+            : null,
+          activity_type: data.activityType || 'reps',
+          is_skipped: false,
+          is_completed: false,
+          rest_duration_seconds: 120,
+          completed_at: null,
+        });
+      }
+      await sessionRepository.insertSets(newSets);
+    } else if (targetTotal < currentTotal) {
+      // Fewer sets needed — remove trailing pending sets, keeping completed ones
+      // Only remove as many pending sets as needed (from the highest set_number down)
+      const toRemoveCount = Math.min(currentTotal - targetTotal, pendingSets.length);
+      if (toRemoveCount > 0) {
+        // Sort pending by set_number descending and remove the last ones
+        const sortedPending = [...pendingSets].sort((a, b) => b.set_number - a.set_number);
+        const idsToDelete = sortedPending.slice(0, toRemoveCount).map((s) => s.id);
+        await sessionRepository.deleteSetsByIds(idsToDelete);
+      }
+    }
+    // If targetTotal === currentTotal, just a type/reps metadata update (no set count change needed)
+
+    return this._buildSessionDetail(sessionId);
+  },
+
+  /**
    * Get the currently active session.
    * @returns {Promise<Object>}
    * @throws {AppError} 404 if no active session

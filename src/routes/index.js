@@ -49,6 +49,8 @@ router.post('/sessions/:id/re-enable', ...sessionController.reEnable);
 router.get('/sessions/:id/skipped-exercises', sessionController.getSkipped);
 router.post('/sessions/:id/add-exercise', ...sessionController.addExercise);
 router.post('/sessions/:id/reorder-exercises', ...sessionController.reorderExercises);
+router.post('/sessions/:id/remove-exercise', ...sessionController.removeExercise);
+router.post('/sessions/:id/edit-exercise', ...sessionController.editExercise);
 router.post('/sessions/:id/complete', ...sessionController.complete);
 router.post('/sessions/:id/cancel', sessionController.cancel);
 router.delete('/sessions/:id', sessionController.delete);
