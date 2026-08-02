@@ -72,6 +72,8 @@ router.delete('/menstruation/:id', menstruationController.delete);
 // Master Activities
 router.get('/activities', activityController.list);
 router.get('/activities/search', activityController.search);
+router.get('/activities/muscles', activityController.listMuscles);
+router.get('/activities/by-muscle/:muscle', activityController.byMuscle);
 router.post('/activities', ...activityController.create);
 
 // Stats / Progress Graphs

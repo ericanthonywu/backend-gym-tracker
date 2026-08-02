@@ -9,6 +9,11 @@ const createSchema = Joi.object({
   category: Joi.string().max(100).allow('', null).optional(),
   muscleGroup: Joi.string().max(100).allow('', null).optional(),
   activityType: Joi.string().valid('reps', 'time').default('reps').optional(),
+  equipment: Joi.string().max(100).allow('', null).optional(),
+  level: Joi.string().valid('beginner', 'intermediate', 'expert').allow('', null).optional(),
+  force: Joi.string().valid('push', 'pull', 'static').allow('', null).optional(),
+  mechanic: Joi.string().valid('compound', 'isolation').allow('', null).optional(),
+  primaryMuscles: Joi.array().items(Joi.string()).optional(),
 });
 
 const activityController = {
@@ -20,11 +25,44 @@ const activityController = {
     } catch (err) { next(err); }
   },
 
-  /** GET /api/activities/search?q=leg */
+  /**
+   * GET /api/activities/search?q=leg&muscle=quadriceps
+   * Both params are optional — omitting both returns all.
+   */
   async search(req, res, next) {
     try {
       const query = (req.query.q || '').toString();
-      const activities = await activityService.search(query);
+      const muscle = (req.query.muscle || '').toString() || null;
+      const activities = await activityService.search(query, muscle);
+      return res.status(200).json(activities);
+    } catch (err) { next(err); }
+  },
+
+  /**
+   * GET /api/activities/muscles
+   * Returns all distinct primary muscles with exercise counts.
+   */
+  async listMuscles(req, res, next) {
+    try {
+      const muscles = await activityService.listMuscles();
+      return res.status(200).json(muscles);
+    } catch (err) { next(err); }
+  },
+
+  /**
+   * GET /api/activities/by-muscle/:muscle
+   * Returns activities whose PRIMARY muscle matches.
+   * Query param ?includeSecondary=true to also include secondary targets.
+   */
+  async byMuscle(req, res, next) {
+    try {
+      const muscle = req.params.muscle || '';
+      const includeSecondary = req.query.includeSecondary === 'true';
+
+      const activities = includeSecondary
+        ? await activityService.listByMuscle(muscle)
+        : await activityService.listByPrimaryMuscle(muscle);
+
       return res.status(200).json(activities);
     } catch (err) { next(err); }
   },

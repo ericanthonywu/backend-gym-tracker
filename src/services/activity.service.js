@@ -11,11 +11,47 @@ const activityService = {
     return activityRepository.findAll();
   },
 
-  async search(query) {
-    if (!query || query.trim().length < 1) {
+  /**
+   * Search activities by name, with optional muscle filter.
+   * @param {string} query
+   * @param {string|null} muscle  - filter to activities that target this muscle
+   */
+  async search(query, muscle = null) {
+    const q = query ? query.trim() : '';
+    const m = muscle ? muscle.trim() : null;
+    if (q.length < 1 && !m) {
       return activityRepository.findAll();
     }
-    return activityRepository.search(query.trim());
+    return activityRepository.search(q, m);
+  },
+
+  /**
+   * Find activities by primary muscle group.
+   * @param {string} muscle  - e.g. 'chest', 'biceps'
+   */
+  async listByPrimaryMuscle(muscle) {
+    if (!muscle || muscle.trim().length < 1) {
+      throw new AppError('Muscle name is required', 400);
+    }
+    return activityRepository.findByPrimaryMuscle(muscle.trim());
+  },
+
+  /**
+   * Find activities that target a muscle (primary OR secondary).
+   * @param {string} muscle
+   */
+  async listByMuscle(muscle) {
+    if (!muscle || muscle.trim().length < 1) {
+      throw new AppError('Muscle name is required', 400);
+    }
+    return activityRepository.findByMuscle(muscle.trim());
+  },
+
+  /**
+   * Return all distinct primary muscles with exercise counts.
+   */
+  async listMuscles() {
+    return activityRepository.listMuscles();
   },
 
   /**
