@@ -60,12 +60,13 @@ const activityRepository = {
 
   /**
    * Search activities by name (case-insensitive contains match).
-   * Optionally filter by muscle group.
+   * Optionally filter by muscle group and/or category.
    * @param {string} query
    * @param {string|null} muscle  - e.g. 'chest', 'biceps'
+   * @param {string|null} category  - e.g. 'strength', 'cardio'
    * @returns {Promise<Array>}
    */
-  async search(query, muscle = null) {
+  async search(query, muscle = null, category = null) {
     let qb = db('master_activities');
 
     if (query && query.trim().length > 0) {
@@ -82,6 +83,10 @@ const activityRepository = {
           .from('activity_muscles')
           .where(db.raw('lower(muscle_name)'), muscleClean);
       });
+    }
+
+    if (category && category.trim().length > 0) {
+      qb = qb.whereILike('category', category.trim());
     }
 
     const rows = await qb.orderBy('name', 'asc').limit(50);
@@ -134,6 +139,19 @@ const activityRepository = {
       .count('* as exercise_count')
       .groupBy('muscle_name')
       .orderBy('muscle_name', 'asc');
+  },
+
+  /**
+   * Return all distinct exercise categories with counts.
+   * @returns {Promise<{category: string, exercise_count: number}[]>}
+   */
+  async listCategories() {
+    return db('master_activities')
+      .select('category')
+      .whereNotNull('category')
+      .count('* as exercise_count')
+      .groupBy('category')
+      .orderBy('category', 'asc');
   },
 
   /**

@@ -26,14 +26,15 @@ const activityController = {
   },
 
   /**
-   * GET /api/activities/search?q=leg&muscle=quadriceps
+   * GET /api/activities/search?q=leg&muscle=quadriceps&category=strength
    * Both params are optional — omitting both returns all.
    */
   async search(req, res, next) {
     try {
       const query = (req.query.q || '').toString();
       const muscle = (req.query.muscle || '').toString() || null;
-      const activities = await activityService.search(query, muscle);
+      const category = (req.query.category || '').toString() || null;
+      const activities = await activityService.search(query, muscle, category);
       return res.status(200).json(activities);
     } catch (err) { next(err); }
   },
@@ -46,6 +47,17 @@ const activityController = {
     try {
       const muscles = await activityService.listMuscles();
       return res.status(200).json(muscles);
+    } catch (err) { next(err); }
+  },
+
+  /**
+   * GET /api/activities/categories
+   * Returns all distinct exercise categories with counts.
+   */
+  async listCategories(req, res, next) {
+    try {
+      const categories = await activityService.listCategories();
+      return res.status(200).json(categories);
     } catch (err) { next(err); }
   },
 

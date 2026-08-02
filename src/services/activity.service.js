@@ -12,17 +12,19 @@ const activityService = {
   },
 
   /**
-   * Search activities by name, with optional muscle filter.
+   * Search activities by name, with optional muscle and/or category filter.
    * @param {string} query
-   * @param {string|null} muscle  - filter to activities that target this muscle
+   * @param {string|null} muscle
+   * @param {string|null} category
    */
-  async search(query, muscle = null) {
+  async search(query, muscle = null, category = null) {
     const q = query ? query.trim() : '';
     const m = muscle ? muscle.trim() : null;
-    if (q.length < 1 && !m) {
+    const c = category ? category.trim() : null;
+    if (q.length < 1 && !m && !c) {
       return activityRepository.findAll();
     }
-    return activityRepository.search(q, m);
+    return activityRepository.search(q, m, c);
   },
 
   /**
@@ -52,6 +54,13 @@ const activityService = {
    */
   async listMuscles() {
     return activityRepository.listMuscles();
+  },
+
+  /**
+   * Return all distinct categories with exercise counts.
+   */
+  async listCategories() {
+    return activityRepository.listCategories();
   },
 
   /**
