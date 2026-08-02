@@ -416,7 +416,7 @@ const sessionService = {
   async cancel(sessionId) {
     const session = await sessionRepository.findById(sessionId);
     if (!session) throw new AppError('Session not found', 404);
-    await sessionRepository.updateSession(sessionId, { status: 'cancelled' });
+    await sessionRepository.deleteSession(sessionId);
   },
 
   /**
